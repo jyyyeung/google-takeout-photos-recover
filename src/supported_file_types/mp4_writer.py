@@ -5,13 +5,13 @@ from src.supported_file_types.exceptions import ExifWriterError
 from src.supported_file_types.exif_writer import ExifWriter
 
 
-class JPGWriter(ExifWriter):
+class MP4Writer(ExifWriter):
     _VERTICAL_DIRECTIONS = ["S", "N"]
     _HORIZONTAL_DIRECTIONS = ["W", "E"]
 
     @staticmethod
     def write(source_filepath: str, output_filepath: str, metadata: dict) -> None:
-        exif_args = JPGWriter._get_exif_args(source_filepath, output_filepath, metadata)
+        exif_args = MP4Writer._get_exif_args(source_filepath, output_filepath, metadata)
         try:
             subprocess.run(
                 exif_args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -33,10 +33,10 @@ class JPGWriter(ExifWriter):
         title = metadata["title"]
 
         exif_args = ["exiftool", "-q", "-P"]
-        exif_args.extend(JPGWriter._get_date_args(timestamp))
-        exif_args.extend(JPGWriter._get_gps_args(latitude, longitude, altitude))
-        exif_args.extend(JPGWriter._get_description_args(description))
-        exif_args.extend(JPGWriter._get_title_args(title))
+        exif_args.extend(MP4Writer._get_date_args(timestamp))
+        exif_args.extend(MP4Writer._get_gps_args(latitude, longitude, altitude))
+        exif_args.extend(MP4Writer._get_description_args(description))
+        exif_args.extend(MP4Writer._get_title_args(title))
         exif_args.append(source_filepath)
         exif_args.append("-o")
         exif_args.append(output_filepath)
@@ -48,9 +48,10 @@ class JPGWriter(ExifWriter):
             ExifWriter.DATETIME_STR_FORMAT
         )
         return [
-            f"-DateTime={formatted_datetime}",
-            f"-DateTimeOriginal={formatted_datetime}",
-            f"-DateTimeDigitized={formatted_datetime}",
+            f"-CreateDate={formatted_datetime}",
+            f"-ModifyDate={formatted_datetime}",
+            f"-MediaCreateDate={formatted_datetime}",
+            f"-MediaModifyDate={formatted_datetime}",
         ]
 
     @staticmethod
@@ -63,11 +64,11 @@ class JPGWriter(ExifWriter):
 
     @staticmethod
     def _get_gps_args(latitude: float, longitude: float, altitude: float) -> list[str]:
-        latitude_ref = JPGWriter._get_direction(
-            latitude, JPGWriter._VERTICAL_DIRECTIONS
+        latitude_ref = MP4Writer._get_direction(
+            latitude, MP4Writer._VERTICAL_DIRECTIONS
         )
-        longitude_ref = JPGWriter._get_direction(
-            longitude, JPGWriter._HORIZONTAL_DIRECTIONS
+        longitude_ref = MP4Writer._get_direction(
+            longitude, MP4Writer._HORIZONTAL_DIRECTIONS
         )
         altitude = round(abs(altitude), 4)
         return [
@@ -83,15 +84,12 @@ class JPGWriter(ExifWriter):
     @staticmethod
     def _get_description_args(description: str) -> list[str]:
         return [
-            f"-Caption-Abstract={description}",
             f"-Description={description}",
-            f"-ImageDescription={description}",
+            f"-Comment={description}",
         ]
 
     @staticmethod
     def _get_title_args(title: str) -> list[str]:
         return [
             f"-Title={title}",
-            f"-ObjectDescription={title}",
-            f"-PreservedFileName={title}",
         ]

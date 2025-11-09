@@ -1,6 +1,7 @@
 import subprocess
 from datetime import datetime
 
+from src.supported_file_types.exceptions import ExifWriterError
 from src.supported_file_types.exif_writer import ExifWriter
 
 
@@ -11,7 +12,14 @@ class PNGWriter(ExifWriter):
     @staticmethod
     def write(source_filepath: str, output_filepath: str, metadata: dict) -> None:
         exif_args = PNGWriter._get_exif_args(source_filepath, output_filepath, metadata)
-        subprocess.run(exif_args, check=True)
+        try:
+            subprocess.run(
+                exif_args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            # Catch all exiftool errors and raise ExifWriterError
+            # This allows the caller to handle it gracefully
+            raise ExifWriterError() from e
 
     @staticmethod
     def _get_exif_args(source_filepath: str, output_filepath: str, metadata: dict) -> list[str]:

@@ -9,30 +9,35 @@ from tqdm import tqdm
 
 from src.supported_file_types.exceptions import ExifWriterError
 from src.supported_file_types.jpg_writer import JPGWriter
+from src.supported_file_types.mp4_writer import MP4Writer
 from src.supported_file_types.png_writer import PNGWriter
 
 
 class Metadata:
     # All keys must be lower case!!!
     _SUPPORTED_EXTENSIONS = {
-        '.jpg': JPGWriter,
-        '.jpeg': JPGWriter,
-        '.heic': JPGWriter,
-        '.tif': JPGWriter,
-        '.tiff': JPGWriter,
-        '.png': PNGWriter,
-        '.webp': JPGWriter,
-        '.gif': JPGWriter,
-        '.mp4': JPGWriter
+        ".jpg": JPGWriter,
+        ".jpeg": JPGWriter,
+        ".heic": JPGWriter,
+        ".tif": JPGWriter,
+        ".tiff": JPGWriter,
+        ".png": PNGWriter,
+        ".webp": JPGWriter,
+        ".gif": JPGWriter,
+        ".mp4": MP4Writer,
+        ".mov": MP4Writer,
+        ".mts": MP4Writer,
     }
     _MIME_TYPES_MAP = {
-        'image/jpeg': ['.jpeg', '.jpg'],
-        'image/heic': ['.heic'],
-        'image/tiff': ['.tif', '.tiff'],
-        'image/png': ['.png'],
-        'image/webp': ['.webp'],
-        'image/gif': ['.gif'],
-        'video/mp4': ['.mp4']
+        "image/jpeg": [".jpeg", ".jpg"],
+        "image/heic": [".heic"],
+        "image/tiff": [".tif", ".tiff"],
+        "image/png": [".png"],
+        "image/webp": [".webp"],
+        "image/gif": [".gif"],
+        "video/mp4": [".mp4"],
+        "video/quicktime": [".mov"],
+        "video/MP2T": [".mts"],
     }
 
     @staticmethod
@@ -43,24 +48,30 @@ class Metadata:
         to output_folder
         """
         files_with_metadata = Metadata._get_files_with_metadata(root_folder)
-        print(f'{len(files_with_metadata)} file(s) to recover metadata')
+        print(f"{len(files_with_metadata)} file(s) to recover metadata")
 
         for media_file, metadata_file in tqdm(files_with_metadata.items()):
-            output_filepath = Metadata._get_output_filename(root_folder, output_folder, media_file)
+            output_filepath = Metadata._get_output_filename(
+                root_folder, output_folder, media_file
+            )
             if metadata_file is None:
-                tqdm.write(f'Skipping {media_file} as there is no metadata associated. Saving to output folder')
+                tqdm.write(
+                    f"Skipping {media_file} as there is no metadata associated. Saving to output folder"
+                )
                 Metadata._copy_file(media_file, output_filepath)
                 continue
 
-            tqdm.write(f'Recovering {media_file}')
+            tqdm.write(f"Recovering {media_file}")
             with open(metadata_file) as f:
                 metadata = json.load(f)
 
             mime_type = magic.from_file(media_file, mime=True)
             valid_extensions = Metadata._MIME_TYPES_MAP.get(mime_type)
             if not valid_extensions:
-                tqdm.write(f'Mime type {mime_type} is not supported. Skipping metadata file {metadata_file}. '
-                           f'Saving image/video file to output folder')
+                tqdm.write(
+                    f"Mime type {mime_type} is not supported. Skipping metadata file {metadata_file}. "
+                    f"Saving image/video file to output folder"
+                )
                 Metadata._copy_file(media_file, output_filepath)
                 continue
 
@@ -76,16 +87,20 @@ class Metadata:
                 revert_file_extension = True
                 media_file_extension = valid_extensions[0]
                 output_filename = os.path.splitext(os.path.basename(output_filepath))[0]
-                output_filepath = os.path.join(output_dir, output_filename + media_file_extension)
+                output_filepath = os.path.join(
+                    output_dir, output_filename + media_file_extension
+                )
                 Metadata._copy_file(media_file, output_filepath)
                 media_file = output_filepath
-                output_filepath = os.path.join(output_dir, f'{output_filename}_changed{media_file_extension}')
+                output_filepath = os.path.join(
+                    output_dir, f"{output_filename}_changed{media_file_extension}"
+                )
 
             exif_writer = Metadata._SUPPORTED_EXTENSIONS[media_file_extension]
             try:
                 exif_writer.write(media_file, output_filepath, metadata)
             except ExifWriterError:
-                tqdm.write('Ignoring exif write')
+                tqdm.write("Ignoring exif write")
                 Metadata._copy_file(media_file, output_filepath)
 
             if revert_file_extension:
@@ -93,10 +108,10 @@ class Metadata:
                 os.remove(media_file)
                 output_filepath = original_output_filepath
 
-            creation_timestamp = int(metadata['creationTime']['timestamp'])
+            creation_timestamp = int(metadata["creationTime"]["timestamp"])
             os.utime(output_filepath, (creation_timestamp, creation_timestamp))
 
-        print('Recovery of metadata completed')
+        print("Recovery of metadata completed")
 
     @staticmethod
     def _get_files_with_metadata(root_folder: str) -> dict[str, str]:
@@ -106,13 +121,13 @@ class Metadata:
 
         # Let's validate if we did not miss any metadata file
         metadata_files = set(files_with_metadata.values())
-        for path in glob.glob(f'{root_folder}/**', recursive=True):
+        for path in glob.glob(f"{root_folder}/**", recursive=True):
             if not os.path.isfile(path):
                 continue
 
             extension = os.path.splitext(path)[1]
-            if extension == '.json' and path not in metadata_files:
-                tqdm.write(f'Cannot find associated image/video file with {path}')
+            if extension == ".json" and path not in metadata_files:
+                tqdm.write(f"Cannot find associated image/video file with {path}")
 
         return files_with_metadata
 
@@ -120,49 +135,68 @@ class Metadata:
     def _get_metadata_files(files: list[str]) -> dict[str, str | None]:
         """Find metadata file associated with a given file. Associate None if no metadata was found for a given file"""
         files_with_metadata = {}
-        for file in files:
+        for img_file in files:
             # Let's check if the metadata file is just appending the .json extension
-            metadata_file = Metadata._sanitize_metadata_filename(f'{file}.json')
+            metadata_file = Metadata._sanitize_metadata_filename(f"{img_file}.json")
             if os.path.isfile(metadata_file):
-                assert file not in files_with_metadata
-                files_with_metadata[file] = metadata_file
+                assert img_file not in files_with_metadata
+                files_with_metadata[img_file] = metadata_file
                 continue
 
             # Check if we should just change the extension to .json
-            metadata_file = Metadata._change_extension(file)
+            metadata_file = Metadata._change_extension(img_file)
             if os.path.isfile(metadata_file):
-                assert file not in files_with_metadata
-                files_with_metadata[file] = metadata_file
+                assert img_file not in files_with_metadata
+                files_with_metadata[img_file] = metadata_file
                 continue
 
+            file_dir = os.path.dirname(img_file)
+            file_name = os.path.basename(img_file)
+            file_extension = os.path.splitext(file_name)[1]
+            file_name_without_extension = os.path.splitext(file_name)[0]
+
             # There is also a case where the metadata file for foo(1).jpg is foo.jpg(1).json
-            filename, extension = os.path.splitext(file)
-            parts = re.split(r'(\(\d+\))$', filename, maxsplit=1)
+            # filename, extension = os.path.splitext(img_file)
+            parts = re.split(r"(\(\d+\))$", file_name_without_extension, maxsplit=1)
             if len(parts) != 3:
-                if not Metadata._is_live_photo(file):
-                    tqdm.write(f'Cannot find metadata for {file}')
-                files_with_metadata[file] = None
+                if not Metadata._is_live_photo(img_file):
+                    tqdm.write(f"Cannot find metadata for {img_file}")
+                files_with_metadata[img_file] = None
                 continue
-            metadata_file = f'{parts[0]}{extension}{parts[1]}.json'
+
+            parts_trimmed = f"{parts[0]}{file_extension}.supplemental-metadata"[:46]
+
+            suffix_number = parts[1]  # (1)
+            metadata_file = f"{file_dir}/{parts_trimmed}{suffix_number}.json"  # img-fe65ae856ccd917b16f86765f78007e4(1).jpg -> img-fe65ae856ccd917b16f86765f78007e4.jpg.suppleme(1).json
             if os.path.isfile(metadata_file):
-                assert file not in files_with_metadata
-                files_with_metadata[file] = metadata_file
+                assert img_file not in files_with_metadata
+                files_with_metadata[img_file] = metadata_file
                 continue
-            if not Metadata._is_live_photo(file):
-                tqdm.write(f'Cannot find metadata for {file}')
-            files_with_metadata[file] = None
+
+            metadata_file = f"{file_dir}/{parts_trimmed[: -len(suffix_number)]}{suffix_number}.json"  # img-fe65ae856ccd917b16f86765f78007e4(1).jpg -> img-fe65ae856ccd917b16f86765f78007e4.jpg.suppl(1)
+            if os.path.isfile(metadata_file):
+                assert img_file not in files_with_metadata
+                files_with_metadata[img_file] = metadata_file
+                continue
+
+            if not Metadata._is_live_photo(img_file):
+                print(
+                    f"Cannot find metadata for {img_file} because {metadata_file} does not exist"
+                )
+                tqdm.write(f"Cannot find metadata for {img_file}")
+            files_with_metadata[img_file] = None
         return files_with_metadata
 
     @staticmethod
     def _get_non_json_files(root_folder: str) -> list[str]:
         """Returns all non json files aka all images and videos"""
         files = []
-        for path in glob.glob(f'{root_folder}/**', recursive=True):
+        for path in glob.glob(f"{root_folder}/**", recursive=True):
             if not os.path.isfile(path):
                 continue
 
             extension = os.path.splitext(path)[1]
-            if extension != '.json':
+            if extension != ".json":
                 files.append(path)
         return files
 
@@ -170,8 +204,10 @@ class Metadata:
     def _change_extension(file: str) -> str:
         """Changes the extension of a file to .json"""
         filepath = os.path.splitext(file)[0]
-        filename = f'{os.path.basename(filepath)}.json'
-        return os.path.join(os.path.dirname(filepath), Metadata._sanitize_metadata_filename(filename))
+        filename = f"{os.path.basename(filepath)}.json"
+        return os.path.join(
+            os.path.dirname(filepath), Metadata._sanitize_metadata_filename(filename)
+        )
 
     @staticmethod
     def _sanitize_metadata_filename(metadata_file: str) -> str:
@@ -181,14 +217,19 @@ class Metadata:
         This method sanitizes the filename to meet google's takeout criteria
         """
         metadata_filepath = os.path.splitext(metadata_file)[0]
-        metadata_filename = os.path.basename(metadata_filepath)[:46]
-        return os.path.join(os.path.dirname(metadata_filepath), f'{metadata_filename}.json')
+        metadata_filename = os.path.basename(
+            metadata_filepath + ".supplemental-metadata"
+        )[:46]
+
+        return os.path.join(
+            os.path.dirname(metadata_filepath), f"{metadata_filename}.json"
+        )
 
     @staticmethod
     def _is_live_photo(file: str) -> bool:
         """Check if the given file is a live photo from iOS"""
         file_path = os.path.splitext(file)[0]
-        return os.path.isfile(f'{file_path}.heic')
+        return os.path.isfile(f"{file_path}.heic")
 
     @staticmethod
     def _copy_file(source: str, destination: str) -> None:
@@ -198,7 +239,9 @@ class Metadata:
         shutil.copy2(source, os.path.normpath(destination))
 
     @staticmethod
-    def _get_output_filename(root_folder: str, output_folder: str, image_path: str) -> str:
+    def _get_output_filename(
+        root_folder: str, output_folder: str, image_path: str
+    ) -> str:
         """
         Returns the output folder by just changing the name of the parent folder. For example, if root_folder is google
         and the image_path is google/takeout/photos2024/foo.jpg the resulting output folder must be
